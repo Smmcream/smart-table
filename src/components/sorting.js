@@ -1,18 +1,35 @@
-import {sortCollection, sortMap} from "../lib/sort.js";
+import {sortMap} from "../lib/utils.js";
 
-export function initSorting(columns) {
+export const initSorting = (columns) => {
+    let field = null;
+    let order = 'none';
+
     return (data, state, action) => {
-        let field = null;
-        let order = null;
+        if (action?.dataset?.field) {
+            action.dataset.value = sortMap[action.dataset.value];
+            field = action.dataset.field;
+            order = action.dataset.value;
 
-        if (action && action.name === 'sort') {
-            // @todo: #3.1 — запомнить выбранный режим сортировки
-
-            // @todo: #3.2 — сбросить сортировки остальных колонок
-        } else {
-            // @todo: #3.3 — получить выбранный режим сортировки
+            columns.forEach(col => {
+                if (col.dataset.field !== field) col.dataset.value = 'none';
+            });
         }
 
-        return sortCollection(data, field, order);
-    }
-}
+        columns.forEach(col => {
+            if (col.dataset.value !== 'none') {
+                field = col.dataset.field;
+                order = col.dataset.value;
+            }
+        });
+
+        if (order === 'none') return data;
+
+        return [...data].sort((a, b) => {
+            const valA = a[field];
+            const valB = b[field];
+            return order === 'asc' ? 
+                valA > valB ? 1 : -1 : 
+                valA < valB ? 1 : -1;
+        });
+    };
+};

@@ -1,14 +1,30 @@
-import {createComparison, defaultRules} from "../lib/compare.js";
-
-// @todo: #4.3 — настроить компаратор
-
 export function initFiltering(elements, indexes) {
-    // @todo: #4.1 — заполнить выпадающие списки опциями
+    // Заполнение select
+    Object.keys(indexes).forEach(name => {
+        const select = elements[name];
+        select.innerHTML = '<option value="">Все</option>';
+        indexes[name].forEach(value => {
+            select.append(new Option(value, value));
+        });
+    });
 
     return (data, state, action) => {
-        // @todo: #4.2 — обработать очистку поля
+        if (action?.name === 'clear') {
+            const field = action.dataset.field;
+            const input = elements[field] || 
+                         action.closest('.filter-group')?.querySelector('input, select');
+            if (input) input.value = '';
+        }
 
-        // @todo: #4.5 — отфильтровать данные используя компаратор
-        return data;
-    }
+        return data.filter(row => {
+            return Object.entries(state).every(([key, value]) => {
+                if (!value) return true;
+                if (key === 'searchBySeller') return row.seller === value;
+                if (key === 'searchByCustomer') return row.customer === value;
+                if (key === 'searchByDateFrom') return new Date(row.date) >= new Date(value);
+                if (key === 'searchByDateTo') return new Date(row.date) <= new Date(value);
+                return true;
+            });
+        });
+    };
 }
