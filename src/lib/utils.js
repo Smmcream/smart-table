@@ -4,9 +4,15 @@ export function processFormData(formData) {
 
 export function cloneTemplate(templateId) {
     const template = document.getElementById(templateId);
+    if (!template) {
+        console.error(`Template not found: ${templateId}`);
+        return { container: document.createElement('div'), elements: {} };
+    }
+
     const clone = template.content.firstElementChild.cloneNode(true);
     const elements = Array.from(clone.querySelectorAll('[data-name]'))
         .reduce((acc, el) => ({...acc, [el.dataset.name]: el}), {});
+
     return {container: clone, elements};
 }
 
@@ -22,5 +28,9 @@ export function getPages(current, total, visibleCount = 5) {
     return Array.from({length: end - start + 1}, (_, i) => start + i);
 }
 
-export const makeIndex = (arr, field, fn) => 
-    arr.reduce((acc, item) => ({...acc, [item[field]]: fn(item)}), {});
+export const makeIndex = (arr, field, transform = v => v) => {
+    return arr.reduce((acc, item) => {
+        acc[item[field]] = transform(item);
+        return acc;
+    }, {});
+};

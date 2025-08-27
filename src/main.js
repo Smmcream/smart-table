@@ -1,100 +1,117 @@
 import './style.css';
-import {initData} from "./data.js";
-import {initTable} from "./components/table.js";
-import {initSorting} from "./components/sorting.js";
-import {initFiltering} from "./components/filtering.js";
-import {initSearching} from "./components/searching.js";
-import {initPagination} from "./components/pagination.js";
+import { data as sourceData } from './data/dataset_1.js';
+import { initData } from './data.js';
+import { initTable } from './components/table.js';
+import { initSorting } from './components/sorting.js';
+import { initFiltering } from './components/filtering.js';
+import { initSearching } from './components/searching.js';
+import { initPagination } from './components/pagination.js';
 
-// Тестовые данные
-const testData = {
-    sellers: [
-        {id: 1, first_name: 'Иван', last_name: 'Иванов'},
-        {id: 2, first_name: 'Петр', last_name: 'Петров'}
-    ],
-    customers: [
-        {id: 1, first_name: 'Алексей', last_name: 'Сидоров'},
-        {id: 2, first_name: 'Мария', last_name: 'Смирнова'}
-    ],
-    purchase_records: [
-        {
-            receipt_id: 1,
-            date: '2023-01-15',
-            seller_id: 1,
-            customer_id: 1,
-            total_amount: 2400
-        },
-        {
-            receipt_id: 2,
-            date: '2023-01-16',
-            seller_id: 2,
-            customer_id: 2,
-            total_amount: 1050
-        }
-    ]
-};
+// API
+const api = initData(sourceData);
+console.log('API initialized');
 
-// Инициализация данных
-const {data, sellers, customers} = initData(testData);
-
-// Инициализация таблицы
-const sampleTable = initTable({
+// Таблица
+const sampleTable = initTable(
+  {
     tableTemplate: 'table',
     rowTemplate: 'row',
     before: ['search', 'header', 'filter'],
     after: ['pagination']
-}, render);
+  },
+  render
+);
 
 // Инициализация модулей
 const applySearching = initSearching(['date', 'seller', 'customer', 'total']);
-const applyFiltering = initFiltering(sampleTable.filter.elements, {
-    searchBySeller: Object.values(sellers),
-    searchByCustomer: Object.values(customers)
-});
+const { applyFiltering, updateIndexes } = initFiltering(sampleTable.filter.elements);
 const applySorting = initSorting([
-    sampleTable.header.elements.sortByDate,
-    sampleTable.header.elements.sortByTotal
+  sampleTable.header.elements.sortByDate,
+  sampleTable.header.elements.sortByTotal
 ]);
-const applyPagination = initPagination(
-    sampleTable.pagination.elements,
-    (el, page, isCurrent) => {
-        const input = el.querySelector('input');
-        const label = el.querySelector('span');
-        input.value = page;
-        input.checked = isCurrent;
-        label.textContent = page;
-        return el;
-    }
+const { applyPagination, updatePagination } = initPagination(
+  sampleTable.pagination.elements,
+  (el, page, isCurrent) => {
+    const input = el.querySelector('input');
+    const label = el.querySelector('span');
+    input.value = page;
+    input.checked = isCurrent;
+    label.textContent = page;
+    return el;
+  }
 );
 
-// Сбор состояния
+// Собираем все значения в один объект
 function collectState() {
-    const formData = new FormData(sampleTable.container);
-    const state = Object.fromEntries(formData.entries());
-    
-    return {
-        ...state,
-        rowsPerPage: parseInt(state.rowsPerPage || 10),
-        page: parseInt(state.page || 1)
-    };
+  const formData = new FormData(sampleTable.container);
+  const state = Object.fromEntries(formData.entries());
+
+  return {
+    ...state,
+    rowsPerPage: parseInt(state.rowsPerPage || 10),
+    page: parseInt(state.page || 1)
+  };
 }
 
-// Функция рендеринга
-function render(action) {
-    let state = collectState();
-    let result = [...data];
-    
-    // Правильная последовательность обработки
-    result = applySearching(result, state, action);
-    result = applyFiltering(result, state, action);
-    result = applySorting(result, state, action);
-    result = applyPagination(result, state, action);
-    
-    sampleTable.render(result);
+// Рендерим через функцию
+async function render(action) {
+  let state = collectState();
+  let query = {};
+
+  // Применяем модули к query
+  query = applySearching(query, state, action);
+  query = applyFiltering(query, state, action);
+  query = applySorting(query, state, action);
+  query = applyPagination(query, state, action);
+
+  const { total, items } = await api.getRecords(query);
+
+  updatePagination(total, query);
+  sampleTable.render(items);
 }
 
-// Инициализация приложения
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelector('#app').appendChild(sampleTable.container);
+// Импорт нашего датасета
+async function loadDataset(datasetNumber) {
+  try {
+    const module = await import(`./data/dataset_${datasetNumber}.js`);
+    const apiNew = initData(module.data);
+
+    // Обновляем API
+    Object.assign(api, apiNew);
+
+    // Получаем новые индексы и обновляем фильтры
+    const indexes = await api.getIndexes();
+    updateIndexes(indexes);
+
     render();
+  } catch (error) {
+    console.error('Error loading dataset:', error);
+  }
+}
+
+// Ждем пока страница загрузится и запускаем приложение
+document.addEventListener('DOMContentLoaded', async () => {
+  const appContainer = document.querySelector('#app');
+
+  // Переключатель данных из трех датасетов для удобной сортировки
+  const switcherContainer = document.createElement('div');
+  switcherContainer.className = 'dataset-switcher';
+  switcherContainer.innerHTML = `
+        <button data-dataset="1">Dataset_1</button>
+        <button data-dataset="2">Dataset_2</button>
+        <button data-dataset="3">Dataset_3</button>
+      `;
+
+  switcherContainer.querySelectorAll('button').forEach((btn) => {
+    btn.addEventListener('click', () => loadDataset(btn.dataset.dataset));
+  });
+
+  appContainer.appendChild(switcherContainer);
+  appContainer.appendChild(sampleTable.container);
+
+  // Здесь получаем индексы и обновляем фильтры
+  const indexes = await api.getIndexes();
+  updateIndexes(indexes);
+
+  render();
 });

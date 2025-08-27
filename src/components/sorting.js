@@ -1,35 +1,24 @@
-import {sortMap} from "../lib/utils.js";
+import { sortMap } from "../lib/utils.js";
 
 export const initSorting = (columns) => {
-    let field = null;
-    let order = 'none';
+  return (query, state, action) => {
+    if (action?.dataset?.field) {
+      action.dataset.value = sortMap[action.dataset.value];
 
-    return (data, state, action) => {
-        if (action?.dataset?.field) {
-            action.dataset.value = sortMap[action.dataset.value];
-            field = action.dataset.field;
-            order = action.dataset.value;
+      columns.forEach((col) => {
+        if (col !== action) col.dataset.value = 'none';
+      });
 
-            columns.forEach(col => {
-                if (col.dataset.field !== field) col.dataset.value = 'none';
-            });
-        }
+      if (action.dataset.value === 'none') {
+        const { sort, ...restQuery } = query;
+        return restQuery;
+      }
 
-        columns.forEach(col => {
-            if (col.dataset.value !== 'none') {
-                field = col.dataset.field;
-                order = col.dataset.value;
-            }
-        });
-
-        if (order === 'none') return data;
-
-        return [...data].sort((a, b) => {
-            const valA = a[field];
-            const valB = b[field];
-            return order === 'asc' ? 
-                valA > valB ? 1 : -1 : 
-                valA < valB ? 1 : -1;
-        });
-    };
+      return {
+        ...query,
+        sort: `${action.dataset.field}:${action.dataset.value}`,
+      };
+    }
+    return query;
+  };
 };
