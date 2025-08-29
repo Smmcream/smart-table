@@ -1,61 +1,68 @@
 export function initFiltering(elements) {
-  const updateIndexes = (indexes) => {
-    // Здесь заполняются продавцы
-    const sellerSelect = elements.searchBySeller;
-    if (sellerSelect?.tagName === 'SELECT') {
-      const selectedValue = sellerSelect.value;
+    const updateIndexes = (indexes) => {
+        const sellerSelect = elements.searchBySeller;
+        if (sellerSelect?.tagName === 'SELECT') {
+            // Сохраняем выбранное значение продавца, чтобы не потерять его при обновлении
+            const selectedValue = sellerSelect.value;
+            
+            // Очищаем список и добавляем пустую опцию (чтобы можно было выбрать "ничего")
+            sellerSelect.innerHTML = '<option value="">—</option>';
+            
+            // Добавляем всех продавцов в список
+            indexes.sellers.forEach(seller => {
+                const option = document.createElement('option');
+                option.value = seller;
+                option.textContent = seller;
+                sellerSelect.appendChild(option);
+            });
+            
+            // Восстанавливаем выбранное значение, если оно было
+            if (selectedValue) {
+                sellerSelect.value = selectedValue;
+            }
+        }
+    };
 
-      sellerSelect.innerHTML = '<option value="">All</option>';
-      indexes.sellers.forEach((seller) => {
-        const option = new Option(seller, seller);
-        sellerSelect.add(option);
-      });
+    const applyFiltering = (query, state, action) => {
+        if (action?.name === 'clear') {
+            const field = action.dataset.field; 
+            const input = elements[`searchBy${field.charAt(0).toUpperCase() + field.slice(1)}`]; // Находим нужный input
+            if (input) {
+                input.value = '';
+                // Если очищается диапазон по total, очищаем оба поля
+                if (field === 'total') {
+                    elements.totalFrom.value = '';
+                    elements.totalTo.value = '';
+                }
+            }
+            return query;
+        }
 
-      if (selectedValue) {
-        sellerSelect.value = selectedValue;
-      }
-    }
-  };
+        // Собираем все поисковые слова и/или фразы
+        let searchTerms = [];
+        
+        // Добавляем основной поисковый запрос, если есть
+        if (state.search) {
+            searchTerms.push(state.search);
+        }
+        
+        // Добавляем фильтры по дате, клиенту, селлеру и тотал
+        if (elements.searchByDate?.value) searchTerms.push(elements.searchByDate.value);
+        if (elements.searchByCustomer?.value) searchTerms.push(elements.searchByCustomer.value);
+        if (elements.searchBySeller?.value) searchTerms.push(elements.searchBySeller.value);
+        if (elements.totalFrom?.value) searchTerms.push(`>=${elements.totalFrom.value}`);
+        if (elements.totalTo?.value) searchTerms.push(`<=${elements.totalTo.value}`);
 
-  const applyFiltering = (query, state, action) => {
-    // Чистим фильтры через clear, вроде корректно
-    if (action?.name === 'clear') {
-      const field = action.dataset.field;
-      const input =
-        elements[field] ||
-        action.closest('.filter-group')?.querySelector('input, select');
-      if (input) input.value = '';
-    }
+        // Объединяем все фильтры в одну строку поиска
+        if (searchTerms.length > 0) {
+            return {
+                ...query,
+                search: searchTerms.join(' ')
+            };
+        }
 
-    // Создаем объект для фильтров
-    const filters = {};
+        return query;
+    };
 
-    // Проверяем данные фильтра
-    Object.keys(elements).forEach((key) => {
-      const element = elements[key];
-      if (
-        element &&
-        ['INPUT', 'SELECT'].includes(element.tagName) &&
-        element.value
-      ) {
-        const filterField = element.name;
-        filters[filterField] = element.value;
-      }
-    });
-
-    // Добавляем фильтры к query, если есть
-    if (Object.keys(filters).length > 0) {
-      return {
-        ...query,
-        filter: filters,
-      };
-    }
-
-    return query;
-  };
-
-  return {
-    updateIndexes,
-    applyFiltering,
-  };
+    return { updateIndexes, applyFiltering };
 }

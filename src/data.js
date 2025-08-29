@@ -1,90 +1,98 @@
-import { makeIndex } from "./lib/utils.js";
+export function initData() {
+    const BASE_URL = 'https://webinars.webdev.education-services.ru/sp7-api';
 
-export function initData(sourceData) {
-    if (!sourceData?.purchase_records) {
-        console.error("Invalid data format:", sourceData);
-        return {
-            getIndexes: async () => ({ sellers: [], customers: [] }),
-            getRecords: async () => ({ total: 0, items: [] })
-        };
-    }
-
-    // Если все правильно, создаются нужные индексы
-    const sellers = makeIndex(sourceData.sellers, 'id', v => `${v.first_name} ${v.last_name}`);
-    const customers = makeIndex(sourceData.customers, 'id', v => `${v.first_name} ${v.last_name}`);
-
-    const allData = sourceData.purchase_records.map((item) => {
-        const seller = sellers[item.seller_id] || 'Unknown Seller';
-        const customer = customers[item.customer_id] || 'Unknown Customer';
-
-        return {
-            id: item.receipt_id,
-            date: item.date,
-            seller,
-            customer,
-            total: item.total_amount,
-            ...item
-        };
-    });
+    let sellersMap = {};
+    let customersMap = {};
 
     const getIndexes = async () => {
-        return { 
-            sellers: Object.values(sellers), 
-            customers: Object.values(customers) 
-        };
+        try {
+            const [sellersResponse, customersResponse] = await Promise.all([
+                fetch(`${BASE_URL}/sellers`),
+                fetch(`${BASE_URL}/customers`)
+            ]);
+
+            const sellersData = await sellersResponse.json();
+            const customersData = await customersResponse.json();
+
+            if (typeof sellersData === 'object' && !Array.isArray(sellersData)) {
+                sellersMap = sellersData;
+            }
+
+            if (typeof customersData === 'object' && !Array.isArray(customersData)) {
+                customersMap = customersData;
+            }
+
+            return { 
+                sellers: Object.values(sellersMap),
+                customers: Object.values(customersMap)
+            };
+
+        } catch (error) {
+            console.error('Error fetching indexes:', error);
+            return { sellers: [], customers: [] };
+        }
     };
 
     const getRecords = async (query = {}) => {
-        let resultData = [...allData];
-
-        // Поиск
-        if (query.search) {
-            const searchTerm = query.search.toLowerCase();
-            resultData = resultData.filter(item => 
-                item.date.toLowerCase().includes(searchTerm) ||
-                item.seller.toLowerCase().includes(searchTerm) ||
-                item.customer.toLowerCase().includes(searchTerm) ||
-                item.total.toString().includes(searchTerm)
-            );
-        }
-
-        // Здесь работает фильтр
-        if (query.filter) {
-            Object.entries(query.filter).forEach(([field, value]) => {
-                if (value) {
-                    resultData = resultData.filter(item => 
-                        String(item[field] || '').toLowerCase().includes(value.toLowerCase())
-                    );
+        try {
+            const params = new URLSearchParams();
+            
+            console.log('Input query:', query);
+            
+            // Базовые параметры
+            if (query.page) params.append('page', query.page.toString());
+            if (query.limit) params.append('limit', query.limit.toString());
+            
+            // Делаем сортировку
+            if (query.sort) {
+                const [field, order] = query.sort.split(':');
+                if (field && order) {
+                    const serverOrder = order === 'asc' ? 'up' : order === 'desc' ? 'down' : order;
+                    params.append('sort', `${field}:${serverOrder}`);
                 }
+            }
+            
+            // Сервер сам ищет по всем полям: дата, селлер и тд
+            if (query.search) {
+                params.append('search', query.search);
+            }
+
+            const url = `${BASE_URL}/records?${params}`;
+            console.log('Request URL:', url);
+
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Server response:', errorText);
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+            
+            const data = await response.json();
+            console.log('Server data received:', data);
+
+            const items = data.items.map(item => {
+                const sellerName = sellersMap[item.seller_id] || `Seller ${item.seller_id}`;
+                const customerName = customersMap[item.customer_id] || `Customer ${item.customer_id}`;
+
+                return {
+                    id: item.receipt_id,
+                    date: item.date,
+                    seller: sellerName,
+                    customer: customerName,
+                    total: item.total_amount
+                };
             });
+
+            return {
+                total: data.total,
+                items: items
+            };
+
+        } catch (error) {
+            console.error('Error in getRecords:', error);
+            return { total: 0, items: [] };
         }
-
-        // Здесь сортируем данные
-        if (query.sort) {
-            const [field, order] = query.sort.split(':');
-            resultData.sort((a, b) => {
-                const valA = a[field];
-                const valB = b[field];
-
-                if (order === 'asc') {
-                    return valA > valB ? 1 : -1;
-                } else {
-                    return valA < valB ? 1 : -1;
-                }
-            });
-        }
-
-        const total = resultData.length;
-
-        // Применяем пагинацию
-        if (query.limit && query.page) {
-            const limit = parseInt(query.limit);
-            const page = parseInt(query.page);
-            const startIndex = (page - 1) * limit;
-            resultData = resultData.slice(startIndex, startIndex + limit);
-        }
-
-        return { total, items: resultData };
     };
 
     return { getIndexes, getRecords };

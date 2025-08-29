@@ -1,10 +1,12 @@
-import {cloneTemplate} from "../lib/utils.js";
+import { cloneTemplate } from "../lib/utils.js";
 
 export function initTable(settings, onAction) {
-    const {tableTemplate, rowTemplate, before, after} = settings;
+    const { tableTemplate, rowTemplate, before, after } = settings;
+    
+    // Клонируем основной шаблон таблицы
     const root = cloneTemplate(tableTemplate);
-
-    // Добавление шаблонов
+    
+    // Добавляем шаблон before/after
     before.reverse().forEach(subName => {
         root[subName] = cloneTemplate(subName);
         root.container.prepend(root[subName].container);
@@ -23,9 +25,12 @@ export function initTable(settings, onAction) {
         onAction(e.submitter);
     });
 
+    // Рендерим наши данные
     const render = (data) => {
         const nextRows = data.map(item => {
             const row = cloneTemplate(rowTemplate);
+            
+            // Теперь заполняем ячеййки данными
             Object.keys(item).forEach(key => {
                 if (row.elements[key]) {
                     const el = row.elements[key];
@@ -36,10 +41,13 @@ export function initTable(settings, onAction) {
                     }
                 }
             });
+            
             return row.container;
         });
+        
+        // Меняем строки в таблице
         root.elements.rows.replaceChildren(...nextRows);
     };
 
-    return {...root, render};
+    return { ...root, render };
 }
