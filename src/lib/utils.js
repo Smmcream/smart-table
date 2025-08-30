@@ -18,7 +18,7 @@ export function cloneTemplate(templateId) {
 
 export const sortMap = {
     'none': 'asc',
-    'asc': 'desc',
+    'asc': 'desc', 
     'desc': 'none'
 };
 

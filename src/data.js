@@ -14,13 +14,8 @@ export function initData() {
             const sellersData = await sellersResponse.json();
             const customersData = await customersResponse.json();
 
-            if (typeof sellersData === 'object' && !Array.isArray(sellersData)) {
-                sellersMap = sellersData;
-            }
-
-            if (typeof customersData === 'object' && !Array.isArray(customersData)) {
-                customersMap = customersData;
-            }
+            sellersMap = sellersData;
+            customersMap = customersData;
 
             return { 
                 sellers: Object.values(sellersMap),
@@ -28,7 +23,6 @@ export function initData() {
             };
 
         } catch (error) {
-            console.error('Error fetching indexes:', error);
             return { sellers: [], customers: [] };
         }
     };
@@ -37,52 +31,37 @@ export function initData() {
         try {
             const params = new URLSearchParams();
             
-            console.log('Input query:', query);
+            if (query.page) params.append('page', query.page);
+            if (query.limit) params.append('limit', query.limit);
             
-            // Базовые параметры
-            if (query.page) params.append('page', query.page.toString());
-            if (query.limit) params.append('limit', query.limit.toString());
-            
-            // Делаем сортировку
             if (query.sort) {
                 const [field, order] = query.sort.split(':');
                 if (field && order) {
-                    const serverOrder = order === 'asc' ? 'up' : order === 'desc' ? 'down' : order;
+                    const serverOrder = order === 'asc' ? 'up' : 'down';
                     params.append('sort', `${field}:${serverOrder}`);
                 }
             }
             
-            // Сервер сам ищет по всем полям: дата, селлер и тд
             if (query.search) {
                 params.append('search', query.search);
             }
 
             const url = `${BASE_URL}/records?${params}`;
-            console.log('Request URL:', url);
-
             const response = await fetch(url);
             
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Server response:', errorText);
-                throw new Error(`HTTP ${response.status}: ${errorText}`);
+                return { total: 0, items: [] };
             }
             
             const data = await response.json();
-            console.log('Server data received:', data);
 
-            const items = data.items.map(item => {
-                const sellerName = sellersMap[item.seller_id] || `Seller ${item.seller_id}`;
-                const customerName = customersMap[item.customer_id] || `Customer ${item.customer_id}`;
-
-                return {
-                    id: item.receipt_id,
-                    date: item.date,
-                    seller: sellerName,
-                    customer: customerName,
-                    total: item.total_amount
-                };
-            });
+            const items = data.items.map(item => ({
+                id: item.receipt_id,
+                date: item.date,
+                seller: sellersMap[item.seller_id] || `Seller ${item.seller_id}`,
+                customer: customersMap[item.customer_id] || `Customer ${item.customer_id}`,
+                total: item.total_amount
+            }));
 
             return {
                 total: data.total,
@@ -90,7 +69,6 @@ export function initData() {
             };
 
         } catch (error) {
-            console.error('Error in getRecords:', error);
             return { total: 0, items: [] };
         }
     };

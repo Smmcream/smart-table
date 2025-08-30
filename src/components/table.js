@@ -25,7 +25,7 @@ export function initTable(settings, onAction) {
         onAction(e.submitter);
     });
 
-    // Рендерим наши данные
+    // Функция рендеринга данных
     const render = (data) => {
         const nextRows = data.map(item => {
             const row = cloneTemplate(rowTemplate);

@@ -1,8 +1,7 @@
 export function initSearching(searchField) {
     return (query, state, action) => {
-        const searchValue = state[searchField] || '';
-        if (searchValue.trim()) {
-            return { ...query, search: searchValue.trim() };
+        if (state[searchField]) {
+            return { ...query, search: state[searchField] };
         }
         return query;
     };

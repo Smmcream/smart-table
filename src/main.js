@@ -6,11 +6,8 @@ import { initFiltering } from './components/filtering.js';
 import { initSearching } from './components/searching.js';
 import { initPagination } from './components/pagination.js';
 
-// API
 const api = initData();
-console.log('API initialized');
 
-// Таблица
 const sampleTable = initTable(
     {
         tableTemplate: 'table',
@@ -18,11 +15,10 @@ const sampleTable = initTable(
         before: ['search', 'header', 'filter'],
         after: ['pagination']
     },
-    render
+    render 
 );
 
-// Инициализация модулей
-const applySearching = initSearching(['date', 'seller', 'customer', 'total']);
+const applySearching = initSearching('search');
 const { applyFiltering, updateIndexes } = initFiltering(sampleTable.filter.elements);
 const applySorting = initSorting([
     sampleTable.header.elements.sortByDate,
@@ -40,44 +36,66 @@ const { applyPagination, updatePagination } = initPagination(
     }
 );
 
-// Собираем все значения в один объект
 function collectState() {
     const formData = new FormData(sampleTable.container);
     const state = Object.fromEntries(formData.entries());
-
+    
     return {
-        ...state,
+        search: state.search || '',
         rowsPerPage: parseInt(state.rowsPerPage || 10),
-        page: parseInt(state.page || 1)
+        page: parseInt(state.page || 1),
+        date: state.date || '',
+        customer: state.customer || '',
+        seller: state.seller || '',
+        totalFrom: state.totalFrom || '',
+        totalTo: state.totalTo || ''
     };
 }
 
-// Рендерим через функцию
 async function render(action) {
     let state = collectState();
     let query = {};
 
-    // Применяем модули к query
     query = applySearching(query, state, action);
     query = applyFiltering(query, state, action);
     query = applySorting(query, state, action);
     query = applyPagination(query, state, action);
 
-    console.log('Final query:', query);
-
     const { total, items } = await api.getRecords(query);
-    updatePagination(total, query);
-    sampleTable.render(items);
+    
+    let filteredItems = items;
+    
+    //фильтруем по конкретным полям на клиенте
+    if (state.date) {
+        filteredItems = filteredItems.filter(item => item.date.includes(state.date));
+    }
+    if (state.customer) {
+        filteredItems = filteredItems.filter(item => item.customer.includes(state.customer));
+    }
+    if (state.seller) {
+        filteredItems = filteredItems.filter(item => item.seller.includes(state.seller));
+    }
+    if (state.totalFrom || state.totalTo) {
+        filteredItems = filteredItems.filter(item => {
+            const itemTotal = parseFloat(item.total);
+            const from = state.totalFrom ? parseFloat(state.totalFrom) : 0;
+            const to = state.totalTo ? parseFloat(state.totalTo) : Number.MAX_SAFE_INTEGER;
+            return itemTotal >= from && itemTotal <= to;
+        });
+    }
+
+    updatePagination(filteredItems.length, query);
+    sampleTable.render(filteredItems);
 }
 
-// Ждем пока страница загрузится и запускаем приложение
-document.addEventListener('DOMContentLoaded', async () => {
-    const appContainer = document.querySelector('#app');
-    appContainer.appendChild(sampleTable.container);
-
-    // Получаем индексы и обновляем фильтры
+async function initApp() {
     const indexes = await api.getIndexes();
     updateIndexes(indexes);
-
     render();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const appContainer = document.querySelector('#app');
+    appContainer.appendChild(sampleTable.container);
+    initApp();
 });
