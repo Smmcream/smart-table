@@ -33,7 +33,6 @@ export function initFiltering(elements) {
     }
     return {};
 }
-
         // Добавляем фильтры в query для сервера
         const filter = {};
         

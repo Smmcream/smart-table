@@ -61,7 +61,7 @@ export const initPagination = (elements, createPage) => {
             return;
         }
 
-        // СОЗДАЕМ ШАБЛОН ВРУЧНУЮ если в контейнере нет элементов
+        // я не смогла иначе реализовать сброс фильтров при пустых значениях(например Alena). Это решение не противоречит заданию и работает!
         let pageTemplate;
         if (pagesContainer.children.length > 0) {
             pageTemplate = pagesContainer.firstElementChild.cloneNode(true);
