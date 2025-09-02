@@ -1,61 +1,87 @@
-import { getPages } from "../lib/utils.js"; 
- 
-export const initPagination = ( 
-    { pages, fromRow, toRow, totalRows }, 
-    createPage 
-) => { 
-    let pageCount = 1; 
- 
-    const applyPagination = (query, state, action) => { 
-        const limit = state.rowsPerPage;  
-        let currentPage = state.page || 1;  
- 
-        if (action) { 
-            switch (action.name) { 
+import { getPages } from "../lib/utils.js";
+
+export const initPagination = (elements, createPage) => {
+    let pageCount = 1;
+
+    const applyPagination = (query, state, action) => {
+        const limit = state.rowsPerPage;
+        let page = state.page || 1;
+
+        if (action) {
+            switch(action.name) {
                 case 'prev': 
-                    currentPage = Math.max(1, currentPage - 1); // Перейти на предыдущую страницу 
-                    break; 
+                    page = Math.max(1, page - 1);
+                    break;
                 case 'next': 
-                    currentPage = Math.min(pageCount, currentPage + 1); // На следующую 
-                    break; 
+                    page = Math.min(pageCount, page + 1);
+                    break;
                 case 'first': 
-                    currentPage = 1; // Первая страница 
-                    break; 
+                    page = 1;
+                    break;
                 case 'last': 
-                    currentPage = pageCount; // Последняя страница 
-                    break; 
-                case 'page': 
-                    currentPage = parseInt(action.value); // Перейти на выбранную страницу 
-                    break; 
-            } 
-        } 
- 
-        return { 
-            ...query, 
-            limit: limit, 
-            page: currentPage, 
-        }; 
-    }; 
- 
-    const updatePagination = (total, { page = 1, limit = 10 }) => { 
-        // Обновляем число страниц 
-        pageCount = Math.ceil(total / limit); 
-        const skip = (page - 1) * limit;  
- 
-        // Здесь показываем номера строк, которые сейчас видим 
-        fromRow.textContent = total === 0 ? 0 : skip + 1; 
-        toRow.textContent = Math.min(skip + limit, total); 
-        totalRows.textContent = total;  
- 
-        // А тут создаем список страниц для навигации 
-        const visiblePages = getPages(page, pageCount, 5); 
-        pages.replaceChildren( 
-            ...visiblePages.map((pageNum) => { 
-                const el = pages.firstElementChild.cloneNode(true); 
-                return createPage(el, pageNum, pageNum === page); 
-            }) 
-        ); 
-    }; 
- 
-    return { applyPagination, updatePagination }; 
-}; 
+                    page = pageCount;
+                    break;
+                case 'page':
+                    page = parseInt(action.value);
+                    break;
+            }
+        }
+
+        return {
+            ...query,
+            limit: limit,
+            page: page
+        };
+    };
+
+    const updatePagination = (total, { page = 1, limit = 10 }) => {
+        pageCount = Math.ceil(total / limit);
+        const currentPage = Math.min(Math.max(1, page), pageCount);
+        const skip = (currentPage - 1) * limit;
+
+        // Обновление статуса
+        elements.fromRow.textContent = total === 0 ? 0 : skip + 1;
+        elements.toRow.textContent = Math.min(skip + limit, total);
+        elements.totalRows.textContent = total;
+
+        // Обновление кнопок навигации
+        elements.firstPage.disabled = (currentPage === 1);
+        elements.previousPage.disabled = (currentPage === 1);
+        elements.nextPage.disabled = (currentPage === pageCount);
+        elements.lastPage.disabled = (currentPage === pageCount);
+
+        // Обновление страниц
+        const pagesContainer = elements.pages;
+        
+        // Очищаем контейнер
+        pagesContainer.innerHTML = '';
+        
+        // Если нет данных или страниц - выходим
+        if (total === 0 || pageCount === 0) {
+            return;
+        }
+
+        // СОЗДАЕМ ШАБЛОН ВРУЧНУЮ если в контейнере нет элементов
+        let pageTemplate;
+        if (pagesContainer.children.length > 0) {
+            pageTemplate = pagesContainer.firstElementChild.cloneNode(true);
+        } else {
+            // Создаем базовый шаблон для клонирования
+            const template = document.createElement('label');
+            template.className = 'pagination-button';
+            template.innerHTML = `
+                <input type="radio" name="page">
+                <span></span>
+            `;
+            pageTemplate = template;
+        }
+
+        const visiblePages = getPages(currentPage, pageCount, 5);
+        visiblePages.forEach(pageNum => {
+            const pageElement = pageTemplate.cloneNode(true);
+            pagesContainer.appendChild(createPage(pageElement, pageNum, pageNum === currentPage));
+        });
+    };
+
+    return { applyPagination, updatePagination };
+};

@@ -1,7 +1,9 @@
 export function initFiltering(elements) {
     const updateIndexes = (indexes) => {
+        console.log('Updating indexes:', indexes); 
+        
         const sellerSelect = elements.searchBySeller;
-        if (sellerSelect) {
+        if (sellerSelect && indexes.sellers) {
             const selectedValue = sellerSelect.value;
             sellerSelect.innerHTML = '<option value="">—</option>';
             
@@ -20,36 +22,53 @@ export function initFiltering(elements) {
 
     const applyFiltering = (query, state, action) => {
         if (action?.name === 'clear') {
-            const field = action.dataset.field; 
-            if (field === 'total') {
-                elements.totalFrom.value = '';
-                elements.totalTo.value = '';
-            } else {
-                const input = elements[`searchBy${field.charAt(0).toUpperCase() + field.slice(1)}`];
-                if (input) input.value = '';
-            }
-            return query;
+    const field = action.dataset.field;
+    
+    if (field === 'total') {
+        elements.totalFrom.value = '';
+        elements.totalTo.value = '';
+    } else {
+        const input = elements[`searchBy${field.charAt(0).toUpperCase() + field.slice(1)}`];
+        if (input) input.value = '';
+    }
+    return {};
+}
+
+        // Добавляем фильтры в query для сервера
+        const filter = {};
+        
+        // Фильтрация по дате
+        if (state.date) {
+            filter['date'] = state.date;
+        }
+        
+        // Фильтрация по клиенту
+        if (state.customer) {
+            filter['customer'] = state.customer;
+        }
+        
+        // Фильтрация по продавцу
+        if (state.seller && state.seller !== '—') {
+            filter['seller'] = state.seller;
+        }
+        
+        // Фильтрация по диапазону total
+        if (state.totalFrom || state.totalTo) {
+            if (state.totalFrom) filter['totalFrom'] = parseFloat(state.totalFrom);
+            if (state.totalTo) filter['totalTo'] = parseFloat(state.totalTo);
         }
 
-        let searchTerms = [];
-        
-        // Основной поиск
-        if (state.search) searchTerms.push(state.search);
-        
-        // ПРОСТО ЗНАЧЕНИЯ - сервер сам ищет по всем полям
-        if (state.date) searchTerms.push(state.date);
-        if (state.customer) searchTerms.push(state.customer);
-        if (state.seller) searchTerms.push(state.seller);
-        
-        // Диапазон total на клиенте
-        if (searchTerms.length > 0) {
+        // Если есть какие-то фильтры, добавляем их в query
+        if (Object.keys(filter).length > 0) {
             return {
                 ...query,
-                search: searchTerms.join(' ')
+                filter: filter
             };
         }
-
-        return query;
+        
+        // Если фильтров нет, удаляем параметр filter из query
+        const { filter: _, ...restQuery } = query;
+        return restQuery;
     };
 
     return { updateIndexes, applyFiltering };

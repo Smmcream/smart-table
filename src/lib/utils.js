@@ -17,9 +17,9 @@ export function cloneTemplate(templateId) {
 }
 
 export const sortMap = {
-    'none': 'asc',
-    'asc': 'desc', 
-    'desc': 'none'
+    'none': 'up',      // none → up (первое нажатие)
+    'up': 'down',      // up → down (второе нажатие)  
+    'down': 'none'     // down → none (третье нажатие)
 };
 
 export function getPages(current, total, visibleCount = 5) {
